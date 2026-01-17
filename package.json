@@ -1,0 +1,25 @@
+{
+  "name": "task-management",
+  "version": "1.0.0",
+  "description": "个人任务管理系统 - Vue 3 + Node.js",
+  "scripts": {
+    "install": "npm install --prefix frontend && npm install --prefix backend",
+    "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
+    "preview": "npm run preview --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "vue3",
+    "nodejs",
+    "task-management",
+    "learning"
+  ],
+  "author": "",
+  "license": "MIT"
+}
