@@ -1,85 +1,111 @@
 import express from 'express'
+import Task from '../models/Task.js'
+
 const router = express.Router()
 
-// 临时内存存储（后续可以替换为数据库）
-let tasks = [
-  {
-    id: 1,
-    title: 'Learn Vue 3 basics',
-    description: 'Know the core concepts and Composition API of Vue 3',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  },
-]
-
-let nextId = 3
-
-// 获取所有任务
-router.get('/', (req, res) => {
-  res.json(tasks)
+router.get('/', async (req, res) => {
+  try {
+    const { user_id, status, priority } = req.query
+    const filters = {}
+    
+    if (user_id) filters.user_id = parseInt(user_id)
+    if (status) filters.status = status
+    if (priority) filters.priority = priority
+    
+    const tasks = await Task.findAll(filters)
+    res.json({ success: true, data: tasks })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
-// 获取单个任务
-router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const task = await Task.findById(id)
+    
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' })
+    }
+    
+    res.json({ success: true, data: task })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
-  
-  res.json(task)
 })
 
-// 创建新任务
-router.post('/', (req, res) => {
-  const { title, description, status = 'pending' } = req.body
-  
-  if (!title) {
-    return res.status(400).json({ error: 'Title is required' })
+router.post('/', async (req, res) => {
+  try {
+    const { user_id, title, description, status, priority, due_date } = req.body
+    
+    if (!user_id || !title) {
+      return res.status(400).json({ success: false, error: 'user_id and title are required' })
+    }
+    
+    const newTask = await Task.create({
+      user_id: parseInt(user_id),
+      title,
+      description,
+      status,
+      priority,
+      due_date
+    })
+    
+    res.status(201).json({ success: true, data: newTask })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
-  
-  const newTask = {
-    id: nextId++,
-    title,
-    description: description || '',
-    status,
-    createdAt: new Date().toISOString()
-  }
-  
-  tasks.push(newTask)
-  res.status(201).json(newTask)
 })
 
-// 更新任务
-router.patch('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+router.patch('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { title, description, status, priority, due_date, completed_at } = req.body
+    
+    const task = await Task.findById(id)
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' })
+    }
+    
+    const updatedTask = await Task.update(id, {
+      title,
+      description,
+      status,
+      priority,
+      due_date,
+      completed_at
+    })
+    
+    res.json({ success: true, data: updatedTask })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
-  
-  const { title, description, status } = req.body
-  
-  if (title !== undefined) task.title = title
-  if (description !== undefined) task.description = description
-  if (status !== undefined) task.status = status
-  
-  res.json(task)
 })
 
-// 删除任务
-router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const taskIndex = tasks.findIndex(t => t.id === id)
-  
-  if (taskIndex === -1) {
-    return res.status(404).json({ error: 'Task not found' })
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    
+    const task = await Task.findById(id)
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' })
+    }
+    
+    await Task.delete(id)
+    res.status(204).send()
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
-  
-  tasks.splice(taskIndex, 1)
-  res.status(204).send()
+})
+
+router.get('/user/:user_id/stats', async (req, res) => {
+  try {
+    const user_id = parseInt(req.params.user_id)
+    const stats = await Task.getStatsByUserId(user_id)
+    res.json({ success: true, data: stats })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
 export default router
