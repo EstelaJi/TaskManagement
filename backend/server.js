@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import taskRoutes from './routes/tasks.js'
+import userRoutes from './routes/users.js'
 
 dotenv.config()
 
@@ -15,6 +16,7 @@ app.use(express.urlencoded({ extended: true }))
 
 // 路由
 app.use('/api/tasks', taskRoutes)
+app.use('/api/users', userRoutes)
 
 // 健康检查
 app.get('/api/health', (req, res) => {
