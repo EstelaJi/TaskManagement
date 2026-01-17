@@ -1,86 +1,92 @@
-import express from 'express'
-const router = express.Router()
+import express from 'express';
+import Task from '../models/task.js';
 
-// 临时内存存储（后续可以替换为数据库）
-let tasks = [
-  {
-    id: 1,
-    title: 'Learn Vue 3 basics',
-    description: 'Know the core concepts and Composition API of Vue 3',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  },
-]
+const router = express.Router();
 
-let nextId = 3
-
-// 获取所有任务
-router.get('/', (req, res) => {
-  res.json(tasks)
-})
-
-// 获取单个任务
-router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+router.get('/', async (req, res) => {
+  try {
+    const tasks = await Task.findAll();
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  res.json(task)
-})
+});
 
-// 创建新任务
-router.post('/', (req, res) => {
-  const { title, description, status = 'pending' } = req.body
-  
-  if (!title) {
-    return res.status(400).json({ error: 'Title is required' })
+router.get('/:id', async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const newTask = {
-    id: nextId++,
-    title,
-    description: description || '',
-    status,
-    createdAt: new Date().toISOString()
+});
+
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const tasks = await Task.findByUserId(req.params.userId);
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  tasks.push(newTask)
-  res.status(201).json(newTask)
-})
+});
 
-// 更新任务
-router.patch('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+router.post('/', async (req, res) => {
+  try {
+    const { title, description, status, priority, due_date, user_id } = req.body;
+    if (!title || !user_id) {
+      return res.status(400).json({ error: 'Title and user_id are required' });
+    }
+
+    const task = await Task.create({
+      title,
+      description: description || '',
+      status: status || 'pending',
+      priority: priority || 'medium',
+      due_date,
+      user_id
+    });
+
+    res.status(201).json(task);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const { title, description, status } = req.body
-  
-  if (title !== undefined) task.title = title
-  if (description !== undefined) task.description = description
-  if (status !== undefined) task.status = status
-  
-  res.json(task)
-})
+});
 
-// 删除任务
-router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const taskIndex = tasks.findIndex(t => t.id === id)
-  
-  if (taskIndex === -1) {
-    return res.status(404).json({ error: 'Task not found' })
+router.put('/:id', async (req, res) => {
+  try {
+    const { title, description, status, priority, due_date } = req.body;
+
+    const task = await Task.update(req.params.id, {
+      title,
+      description,
+      status,
+      priority,
+      due_date
+    });
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  tasks.splice(taskIndex, 1)
-  res.status(204).send()
-})
+});
 
-export default router
+router.delete('/:id', async (req, res) => {
+  try {
+    const task = await Task.delete(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
+export default router;
