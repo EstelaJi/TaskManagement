@@ -72,6 +72,20 @@ const createTables = async () => {
     `)
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        duration INTEGER NOT NULL DEFAULT 1500,
+        completed BOOLEAN DEFAULT false,
+        session_type VARCHAR(20) DEFAULT 'work' CHECK (session_type IN ('work', 'short_break', 'long_break')),
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -99,6 +113,17 @@ const createTables = async () => {
       FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
     `)
 
+    // 创建索引以提高查询性能
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_pomodoro_sessions_user_id ON pomodoro_sessions(user_id)
+    `)
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_pomodoro_sessions_task_id ON pomodoro_sessions(task_id)
+    `)
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_pomodoro_sessions_started_at ON pomodoro_sessions(started_at)
+    `)
+
     console.log('✅ Database tables created successfully')
   } catch (error) {
     console.error('❌ Error creating tables:', error)
@@ -118,6 +143,7 @@ const dropTables = async () => {
   })
 
   try {
+    await pool.query('DROP TABLE IF EXISTS pomodoro_sessions CASCADE')
     await pool.query('DROP TABLE IF EXISTS tasks CASCADE')
     await pool.query('DROP TABLE IF EXISTS users CASCADE')
     console.log('✅ Tables dropped successfully')

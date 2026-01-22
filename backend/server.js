@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import taskRoutes from './routes/tasks.js'
 import userRoutes from './routes/users.js'
+import pomodoroRoutes from './routes/pomodoro.js'
 
 dotenv.config()
 
@@ -17,6 +18,7 @@ app.use(express.urlencoded({ extended: true }))
 // 路由
 app.use('/api/tasks', taskRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/pomodoro', pomodoroRoutes)
 
 // 健康检查
 app.get('/api/health', (req, res) => {

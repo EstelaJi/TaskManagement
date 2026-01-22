@@ -118,7 +118,8 @@ import {
   Settings,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Timer
 } from 'lucide-vue-next'
 
 export default {
@@ -132,7 +133,8 @@ export default {
     ListTodo,
     Calendar,
     BarChart3,
-    Settings
+    Settings,
+    Timer
   },
   setup() {
     const router = useRouter()
@@ -148,6 +150,7 @@ export default {
       { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/', count: null },
       { id: 'tasks', label: 'All Tasks', icon: ListTodo, path: '/tasks', count: tasks.value.length },
       { id: 'calendar', label: 'Calendar', icon: Calendar, path: '/calendar', count: null },
+      { id: 'pomodoro', label: 'Time Tracker', icon: Timer, path: '/pomodoro', count: null },
       { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics', count: null }
     ])
 
