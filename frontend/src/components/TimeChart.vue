@@ -38,29 +38,37 @@
     <div class="relative" :style="{ height: height + 'px' }">
       <!-- Bar Chart -->
       <div v-if="chartType === 'bar'" class="flex items-end gap-2 h-full">
-        <div
-          v-for="(item, index) in chartData"
-          :key="index"
-          class="flex-1 flex flex-col items-center gap-2 group"
-        >
-          <div class="flex-1 w-full flex items-end relative">
-            <div
-              class="w-full rounded-t transition-all hover:opacity-80 cursor-pointer"
-              :class="getBarColor(item)"
-              :style="{
-                height: `${getBarHeight(item)}%`,
-                minHeight: getValue(item) > 0 ? '4px' : '0'
-              }"
-              :title="getTooltip(item)"
-            ></div>
-            <!-- Value Label on Hover -->
-            <div
-              class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-800 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10"
-            >
-              {{ formatValue(getValue(item)) }}
+        <!-- Y Axis with Units -->
+        <div class="flex flex-col justify-between h-full pr-2 text-xs text-zinc-500">
+          <span>{{ formatValue(maxValue) }}</span>
+          <span>{{ formatValue(maxValue / 2) }}</span>
+          <span>0{{ props.valueKey.includes('duration') ? 'h' : '' }}</span>
+        </div>
+        <div class="flex-1 flex items-end gap-2 h-full">
+          <div
+            v-for="(item, index) in chartData"
+            :key="index"
+            class="flex-1 flex flex-col items-center gap-2 group"
+          >
+            <div class="flex-1 w-full flex items-end relative">
+              <div
+                class="w-full rounded-t transition-all hover:opacity-80 cursor-pointer"
+                :class="getBarColor(item)"
+                :style="{
+                  height: `${getBarHeight(item)}%`,
+                  minHeight: getValue(item) > 0 ? '4px' : '0'
+                }"
+                :title="getTooltip(item)"
+              ></div>
+              <!-- Value Label on Hover -->
+              <div
+                class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-800 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10"
+              >
+                {{ formatValue(getValue(item)) }}
+              </div>
             </div>
+            <span class="text-xs text-zinc-500 text-center">{{ formatLabel(item) }}</span>
           </div>
-          <span class="text-xs text-zinc-500 text-center">{{ formatLabel(item) }}</span>
         </div>
       </div>
 
@@ -76,14 +84,30 @@
         <!-- Grid Lines -->
         <g v-for="i in 5" :key="'grid-' + i" class="text-zinc-800">
           <line
-            :x1="0"
-            :y1="(i - 1) * 50"
+            :x1="40"
+            :y1="(i - 1) * 40"
             :x2="800"
-            :y2="(i - 1) * 50"
+            :y2="(i - 1) * 40"
             stroke="currentColor"
             stroke-width="1"
             stroke-dasharray="2,2"
           />
+        </g>
+
+        <!-- Y Axis Labels -->
+        <g class="text-xs text-zinc-500">
+          <text x="35" y="15" text-anchor="end">{{ formatValue(maxValue) }}</text>
+          <text x="35" y="55" text-anchor="end">{{ formatValue(maxValue * 0.75) }}</text>
+          <text x="35" y="95" text-anchor="end">{{ formatValue(maxValue * 0.5) }}</text>
+          <text x="35" y="135" text-anchor="end">{{ formatValue(maxValue * 0.25) }}</text>
+          <text x="35" y="175" text-anchor="end">0{{ props.valueKey.includes('duration') ? 'h' : '' }}</text>
+        </g>
+
+        <!-- X Axis Labels -->
+        <g class="text-xs text-zinc-500">
+          <g v-for="(item, index) in chartData" :key="'x-label-' + index">
+            <text :x="getXPosition(index)" y="195" text-anchor="middle">{{ formatLabel(item) }}</text>
+          </g>
         </g>
 
         <!-- Area Fill -->
@@ -110,8 +134,30 @@
             r="4"
             :fill="lineColor"
             class="transition-all hover:r-6 cursor-pointer"
-            :title="getTooltip(item)"
+            @mouseenter="hoveredPoint = { index, item, x: getXPosition(index), y: getYPosition(item) }"
+            @mouseleave="hoveredPoint = null"
           />
+          <!-- Custom Tooltip -->
+          <g v-if="hoveredPoint && hoveredPoint.index === index" class="pointer-events-none">
+            <rect
+              :x="getXPosition(index) - 60"
+              :y="getYPosition(item) - 30"
+              width="120"
+              height="20"
+              rx="4"
+              fill="#27272a"
+              opacity="0.9"
+            />
+            <text
+              :x="getXPosition(index)"
+              :y="getYPosition(item) - 15"
+              text-anchor="middle"
+              fill="white"
+              font-size="12"
+            >
+              {{ getTooltip(item) }}
+            </text>
+          </g>
         </g>
       </svg>
 
@@ -174,6 +220,7 @@ const props = defineProps({
 })
 
 const chartType = ref('bar')
+const hoveredPoint = ref(null)
 
 // 获取图表数据（处理空数据）
 const chartData = computed(() => {
@@ -251,16 +298,16 @@ const getTooltip = (item) => {
 
 // 获取 X 位置（用于折线图）
 const getXPosition = (index) => {
-  if (chartData.value.length <= 1) return 400
-  const spacing = 800 / (chartData.value.length - 1)
-  return index * spacing
+  if (chartData.value.length <= 1) return 440
+  const spacing = (800 - 40) / (chartData.value.length - 1) // 留出左侧40px空间
+  return 40 + (index * spacing)
 }
 
 // 获取 Y 位置（用于折线图）
 const getYPosition = (item) => {
   const value = getValue(item)
   const percentage = maxValue.value > 0 ? (value / maxValue.value) : 0
-  return 200 - (percentage * 180) // 留出上下边距
+  return 180 - (percentage * 160) // 调整Y轴范围
 }
 
 // 获取折线路径
@@ -284,7 +331,7 @@ const getAreaPath = () => {
   const firstX = getXPosition(0)
   const lastX = getXPosition(chartData.value.length - 1)
   
-  return `${linePath} L ${lastX} 200 L ${firstX} 200 Z`
+  return `${linePath} L ${lastX} 180 L ${firstX} 180 Z`
 }
 </script>
 
