@@ -110,6 +110,21 @@ export const mockTasks = [
 ]
 
 /**
+ * 将后端返回的 snake_case 数据转换为前端使用的格式
+ */
+const normalizeTask = (task) => {
+  if (!task) return task
+  return {
+    ...task,
+    dueDate: task.due_date || task.dueDate,
+    due_date: task.due_date || task.dueDate,
+    userId: task.user_id || task.userId,
+    createdAt: task.created_at || task.createdAt,
+    updatedAt: task.updated_at || task.updatedAt
+  }
+}
+
+/**
  * 任务管理的 Composable
  * 提供任务数据的响应式状态和相关方法
  */
@@ -125,7 +140,7 @@ export function useTasks() {
     try {
       const response = await axios.get('/api/tasks')
       if (response.data && response.data.length > 0) {
-        tasks.value = response.data
+        tasks.value = response.data.map(normalizeTask)
       }
     } catch (err) {
       console.error('获取任务失败:', err)
@@ -141,8 +156,9 @@ export function useTasks() {
   const addTask = async taskData => {
     try {
       const response = await axios.post('/api/tasks', taskData)
-      tasks.value.push(response.data)
-      return response.data
+      const normalizedTask = normalizeTask(response.data)
+      tasks.value.push(normalizedTask)
+      return normalizedTask
     } catch (err) {
       console.error('添加任务失败:', err)
       throw err
@@ -153,11 +169,12 @@ export function useTasks() {
   const updateTask = async (id, updates) => {
     try {
       const response = await axios.patch(`/api/tasks/${id}`, updates)
+      const normalizedTask = normalizeTask(response.data)
       const index = tasks.value.findIndex(t => t.id === id)
       if (index !== -1) {
-        tasks.value[index] = { ...tasks.value[index], ...response.data }
+        tasks.value[index] = { ...tasks.value[index], ...normalizedTask }
       }
-      return response.data
+      return normalizedTask
     } catch (err) {
       console.error('更新任务失败:', err)
       throw err
@@ -206,7 +223,9 @@ export function useTasks() {
     today.setHours(0, 0, 0, 0)
     return tasks.value.filter(task => {
       if (task.status === 'completed') return false
-      const dueDate = new Date(task.dueDate)
+      const dueDateStr = task.dueDate || task.due_date
+      if (!dueDateStr) return false
+      const dueDate = new Date(dueDateStr)
       dueDate.setHours(0, 0, 0, 0)
       return dueDate < today
     }).length
@@ -222,7 +241,11 @@ export function useTasks() {
   const highPriorityTasks = computed(() => {
     return tasks.value
       .filter(t => t.priority === 'high' && t.status !== 'completed')
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+      .sort((a, b) => {
+        const dateA = new Date(a.dueDate || a.due_date || 0)
+        const dateB = new Date(b.dueDate || b.due_date || 0)
+        return dateA - dateB
+      })
   })
 
   // 计算属性：即将到期的任务
@@ -235,11 +258,17 @@ export function useTasks() {
     return tasks.value
       .filter(task => {
         if (task.status === 'completed') return false
-        const dueDate = new Date(task.dueDate)
+        const dueDateStr = task.dueDate || task.due_date
+        if (!dueDateStr) return false
+        const dueDate = new Date(dueDateStr)
         dueDate.setHours(0, 0, 0, 0)
         return dueDate >= today && dueDate <= nextWeek
       })
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+      .sort((a, b) => {
+        const dateA = new Date(a.dueDate || a.due_date || 0)
+        const dateB = new Date(b.dueDate || b.due_date || 0)
+        return dateA - dateB
+      })
   })
 
   return {

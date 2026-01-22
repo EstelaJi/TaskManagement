@@ -41,6 +41,9 @@
     </div>
   </div>
 
+  <!-- Task Modal -->
+  <TaskModal :isOpen="isModalOpen" @close="closeModal" @task-added="handleTaskAdded" />
+
   <!-- Filters Row -->
   <div v-if="currentView === 'tasks'" class="flex items-center gap-4 mt-4">
     <select
@@ -77,6 +80,7 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Search, LayoutGrid, List, Plus } from 'lucide-vue-next'
+import TaskModal from '../components/TaskModal.vue'
 
 const route = useRoute()
 
@@ -109,8 +113,20 @@ const filterStatus = ref('all')
 const filterPriority = ref('all')
 const sortBy = ref('dueDate')
 
+// Modal 状态
+const isModalOpen = ref(false)
+
 const openNewTaskDialog = () => {
-  // TODO: 实现打开新任务对话框的逻辑
-  console.log('Open new task dialog')
+  isModalOpen.value = true
+}
+
+const closeModal = () => {
+  isModalOpen.value = false
+}
+
+// 处理任务添加完成（用于刷新数据）
+const handleTaskAdded = () => {
+  // TaskModal 已经处理了添加和刷新，这里只需要确保数据同步
+  // 可以在这里添加额外的逻辑，比如显示成功提示等
 }
 </script>

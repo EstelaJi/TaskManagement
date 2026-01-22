@@ -90,7 +90,7 @@
               >
                 {{ task.title }}
               </p>
-              <p class="text-xs text-zinc-500">{{ task.dueDate }}</p>
+              <p class="text-xs text-zinc-500">{{ task.dueDate || task.due_date }}</p>
             </div>
             <span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">High</span>
           </div>
@@ -115,7 +115,7 @@
               <p class="text-sm truncate">{{ task.title }}</p>
               <p class="text-xs text-zinc-500">{{ getCategoryLabel(task.category) }}</p>
             </div>
-            <span class="text-xs text-zinc-400">{{ task.dueDate }}</span>
+            <span class="text-xs text-zinc-400">{{ task.dueDate || task.due_date }}</span>
           </div>
           <p v-if="upcomingTasks.length === 0" class="text-zinc-500 text-sm text-center py-4">
             No upcoming deadlines
