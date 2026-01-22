@@ -24,8 +24,11 @@ export function getCategoryById(categoryId) {
  * @returns {string} 分类标签
  */
 export function getCategoryLabel(categoryId) {
+  if (!categoryId || categoryId === 'uncategorized' || categoryId === 'null') {
+    return 'Uncategorized'
+  }
   const category = getCategoryById(categoryId)
-  return category ? category.label : categoryId
+  return category ? category.label : categoryId.charAt(0).toUpperCase() + categoryId.slice(1)
 }
 
 /**
@@ -34,6 +37,9 @@ export function getCategoryLabel(categoryId) {
  * @returns {string} 分类颜色类名
  */
 export function getCategoryColor(categoryId) {
+  if (!categoryId || categoryId === 'uncategorized' || categoryId === 'null') {
+    return 'bg-zinc-500'
+  }
   const category = getCategoryById(categoryId)
   return category ? category.color : 'bg-zinc-500'
 }

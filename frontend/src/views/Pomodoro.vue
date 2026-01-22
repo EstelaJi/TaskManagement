@@ -6,6 +6,19 @@
         <h1 class="text-3xl font-bold mb-2">Time Tracker</h1>
         <p class="text-zinc-400">Track your focus time with Pomodoro technique</p>
       </div>
+      <!-- Time Period Selector -->
+      <div class="flex items-center gap-2">
+        <select
+          v-model="selectedPeriod"
+          @change="handlePeriodChange"
+          class="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+        >
+          <option value="day">Daily</option>
+          <option value="week">Weekly</option>
+          <option value="month">Monthly</option>
+          <option value="year">Yearly</option>
+        </select>
+      </div>
     </div>
 
     <!-- Pomodoro Timer -->
@@ -73,35 +86,29 @@
 
     <!-- Charts Section -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Daily Focus Time Chart -->
-      <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-          <BarChart3 class="w-5 h-5 text-emerald-400" />
-          Daily Focus Time (Last 7 Days)
-        </h3>
-        <div class="flex items-end gap-2 h-48">
-          <div
-            v-for="(day, index) in dailyStats"
-            :key="index"
-            class="flex-1 flex flex-col items-center gap-2"
-          >
-            <div class="flex-1 w-full flex items-end">
-              <div
-                class="w-full bg-emerald-500/80 rounded-t transition-all hover:bg-emerald-500"
-                :style="{
-                  height: `${getBarHeight(day.total_duration)}%`,
-                  minHeight: day.total_duration > 0 ? '4px' : '0'
-                }"
-                :title="`${formatDuration(day.total_duration)} on ${formatDate(day.date)}`"
-              ></div>
-            </div>
-            <span class="text-xs text-zinc-500">{{ formatDay(day.date) }}</span>
-          </div>
-        </div>
-        <div v-if="dailyStats.length === 0" class="text-center py-12 text-zinc-500">
-          No data available
-        </div>
-      </div>
+      <!-- Timeline Chart -->
+      <TimeChart
+        :title="`Focus Time (${getPeriodLabel()})`"
+        :icon="BarChart3"
+        icon-color="text-emerald-400"
+        :data="timelineStats"
+        value-key="total_duration"
+        label-key="period"
+        :height="250"
+        line-color="#10b981"
+      />
+
+      <!-- Category Chart -->
+      <TimeChart
+        title="Focus Time by Category"
+        :icon="PieChart"
+        icon-color="text-blue-400"
+        :data="categoryStats"
+        value-key="total_duration"
+        label-key="category"
+        :height="250"
+        line-color="#3b82f6"
+      />
 
       <!-- Session Type Distribution -->
       <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
@@ -221,7 +228,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import {
   Clock,
   CheckCircle,
@@ -230,12 +237,16 @@ import {
   PieChart
 } from 'lucide-vue-next'
 import PomodoroTimer from '../components/PomodoroTimer.vue'
+import TimeChart from '../components/TimeChart.vue'
 import { usePomodoroStats } from '../composables/usePomodoroStats'
+import { getCategoryLabel, getCategoryColor } from '../constants/categories'
 
 const {
   sessions,
   stats,
   dailyStats,
+  timelineStats,
+  categoryStats,
   loading,
   totalFocusHours,
   completionRate,
@@ -243,18 +254,58 @@ const {
   fetchSessions,
   fetchStats,
   fetchDailyStats,
-  formatDuration
+  fetchTimelineStats,
+  fetchCategoryStats,
+  formatDuration,
+  formatDurationHours
 } = usePomodoroStats()
 
-// 获取柱状图高度
-const getBarHeight = (duration) => {
-  if (!duration || duration === 0) return 0
-  const maxDuration = Math.max(
-    ...dailyStats.value.map(d => parseInt(d.total_duration) || 0),
-    1
-  )
-  return (duration / maxDuration) * 100
+const selectedPeriod = ref('day')
+
+// 获取时间段标签
+const getPeriodLabel = () => {
+  const labels = {
+    day: 'Daily',
+    week: 'Weekly',
+    month: 'Monthly',
+    year: 'Yearly'
+  }
+  return labels[selectedPeriod.value] || 'Daily'
 }
+
+// 处理时间段变化
+const handlePeriodChange = async () => {
+  const endDate = new Date()
+  const startDate = new Date()
+  
+  switch (selectedPeriod.value) {
+    case 'day':
+      startDate.setDate(startDate.getDate() - 7)
+      break
+    case 'week':
+      startDate.setDate(startDate.getDate() - 8 * 7) // 8 weeks
+      break
+    case 'month':
+      startDate.setMonth(startDate.getMonth() - 6) // 6 months
+      break
+    case 'year':
+      startDate.setFullYear(startDate.getFullYear() - 2) // 2 years
+      break
+  }
+  
+  await Promise.all([
+    fetchTimelineStats({
+      period: selectedPeriod.value,
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString()
+    }),
+    fetchCategoryStats({
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString()
+    })
+  ])
+}
+
 
 // 格式化日期
 const formatDate = (dateString) => {
@@ -301,12 +352,36 @@ const getSessionTypePercentage = (type) => {
   return (count / stats.total_sessions) * 100
 }
 
+// 获取类别百分比
+const getCategoryPercentage = (item) => {
+  if (categoryStats.value.length === 0) return 0
+  const maxDuration = Math.max(
+    ...categoryStats.value.map(c => parseInt(c.total_duration) || 0),
+    1
+  )
+  const duration = parseInt(item.total_duration) || 0
+  return (duration / maxDuration) * 100
+}
+
 // 加载数据
 onMounted(async () => {
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - 7)
+  
   await Promise.all([
     fetchSessions(),
     fetchStats(),
-    fetchDailyStats()
+    fetchDailyStats(),
+    fetchTimelineStats({
+      period: selectedPeriod.value,
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString()
+    }),
+    fetchCategoryStats({
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString()
+    })
   ])
 })
 </script>

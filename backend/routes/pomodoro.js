@@ -260,4 +260,126 @@ router.get('/stats/daily', async (req, res) => {
   }
 })
 
+// 获取按时间段统计的数据（日/周/月/年）
+router.get('/stats/timeline', async (req, res) => {
+  try {
+    const { user_id, period = 'day', start_date, end_date } = req.query
+    
+    let dateFormat, groupBy
+    switch (period) {
+      case 'day':
+        dateFormat = "DATE(started_at)"
+        groupBy = "DATE(started_at)"
+        break
+      case 'week':
+        dateFormat = "DATE_TRUNC('week', started_at)"
+        groupBy = "DATE_TRUNC('week', started_at)"
+        break
+      case 'month':
+        dateFormat = "DATE_TRUNC('month', started_at)"
+        groupBy = "DATE_TRUNC('month', started_at)"
+        break
+      case 'year':
+        dateFormat = "DATE_TRUNC('year', started_at)"
+        groupBy = "DATE_TRUNC('year', started_at)"
+        break
+      default:
+        dateFormat = "DATE(started_at)"
+        groupBy = "DATE(started_at)"
+    }
+    
+    let query = `
+      SELECT 
+        ${dateFormat} as period,
+        COUNT(*) as total_sessions,
+        SUM(CASE WHEN completed = true THEN duration ELSE 0 END) as total_duration,
+        SUM(CASE WHEN completed = true THEN 1 ELSE 0 END) as completed_sessions,
+        SUM(CASE WHEN session_type = 'work' AND completed = true THEN duration ELSE 0 END) as work_duration,
+        SUM(CASE WHEN session_type = 'short_break' AND completed = true THEN duration ELSE 0 END) as short_break_duration,
+        SUM(CASE WHEN session_type = 'long_break' AND completed = true THEN duration ELSE 0 END) as long_break_duration
+      FROM pomodoro_sessions
+      WHERE 1=1
+    `
+    const conditions = []
+    const values = []
+    let paramCount = 1
+    
+    if (user_id) {
+      conditions.push(`user_id = $${paramCount++}`)
+      values.push(user_id)
+    }
+    
+    if (start_date) {
+      conditions.push(`started_at >= $${paramCount++}`)
+      values.push(start_date)
+    }
+    
+    if (end_date) {
+      conditions.push(`started_at <= $${paramCount++}`)
+      values.push(end_date)
+    }
+    
+    if (conditions.length > 0) {
+      query += ' AND ' + conditions.join(' AND ')
+    }
+    
+    query += ` GROUP BY ${groupBy} ORDER BY period ASC`
+    
+    const result = await pool.query(query, values)
+    res.json(result.rows)
+  } catch (error) {
+    console.error('Error fetching timeline stats:', error)
+    res.status(500).json({ error: 'Failed to fetch timeline stats' })
+  }
+})
+
+// 获取按类别统计的数据
+router.get('/stats/by-category', async (req, res) => {
+  try {
+    const { user_id, start_date, end_date } = req.query
+    
+    let query = `
+      SELECT 
+        COALESCE(t.category, 'uncategorized') as category,
+        COUNT(*) as total_sessions,
+        SUM(CASE WHEN ps.completed = true THEN ps.duration ELSE 0 END) as total_duration,
+        SUM(CASE WHEN ps.completed = true THEN 1 ELSE 0 END) as completed_sessions,
+        AVG(CASE WHEN ps.completed = true THEN ps.duration ELSE NULL END) as avg_duration
+      FROM pomodoro_sessions ps
+      LEFT JOIN tasks t ON ps.task_id = t.id
+      WHERE ps.session_type = 'work'
+    `
+    const conditions = []
+    const values = []
+    let paramCount = 1
+    
+    if (user_id) {
+      conditions.push(`ps.user_id = $${paramCount++}`)
+      values.push(user_id)
+    }
+    
+    if (start_date) {
+      conditions.push(`ps.started_at >= $${paramCount++}`)
+      values.push(start_date)
+    }
+    
+    if (end_date) {
+      conditions.push(`ps.started_at <= $${paramCount++}`)
+      values.push(end_date)
+    }
+    
+    if (conditions.length > 0) {
+      query += ' AND ' + conditions.join(' AND ')
+    }
+    
+    query += ' GROUP BY t.category ORDER BY total_duration DESC'
+    
+    const result = await pool.query(query, values)
+    res.json(result.rows)
+  } catch (error) {
+    console.error('Error fetching category stats:', error)
+    res.status(500).json({ error: 'Failed to fetch category stats' })
+  }
+})
+
 export default router

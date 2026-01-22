@@ -8,6 +8,8 @@ export function usePomodoroStats() {
   const sessions = ref([])
   const stats = ref(null)
   const dailyStats = ref([])
+  const timelineStats = ref([])
+  const categoryStats = ref([])
   const loading = ref(false)
   const error = ref(null)
 
@@ -84,6 +86,42 @@ export function usePomodoroStats() {
     return (total / dailyStats.value.length / 3600).toFixed(1)
   })
 
+  // 获取时间段统计数据（日/周/月/年）
+  const fetchTimelineStats = async (params = {}) => {
+    loading.value = true
+    error.value = null
+    try {
+      const queryParams = new URLSearchParams({ period: 'day', ...params }).toString()
+      const response = await axios.get(`/api/pomodoro/stats/timeline?${queryParams}`)
+      timelineStats.value = response.data
+      return response.data
+    } catch (err) {
+      console.error('获取时间段统计数据失败:', err)
+      error.value = err
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 获取按类别统计数据
+  const fetchCategoryStats = async (params = {}) => {
+    loading.value = true
+    error.value = null
+    try {
+      const queryParams = new URLSearchParams(params).toString()
+      const response = await axios.get(`/api/pomodoro/stats/by-category?${queryParams}`)
+      categoryStats.value = response.data
+      return response.data
+    } catch (err) {
+      console.error('获取类别统计数据失败:', err)
+      error.value = err
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 格式化持续时间（秒转小时分钟）
   const formatDuration = (seconds) => {
     if (!seconds) return '0分钟'
@@ -95,11 +133,19 @@ export function usePomodoroStats() {
     return `${minutes}分钟`
   }
 
+  // 格式化持续时间（秒转小时，保留1位小数）
+  const formatDurationHours = (seconds) => {
+    if (!seconds) return '0'
+    return (seconds / 3600).toFixed(1)
+  }
+
   return {
     // 状态
     sessions,
     stats,
     dailyStats,
+    timelineStats,
+    categoryStats,
     loading,
     error,
     // 计算属性
@@ -110,6 +156,9 @@ export function usePomodoroStats() {
     fetchSessions,
     fetchStats,
     fetchDailyStats,
-    formatDuration
+    fetchTimelineStats,
+    fetchCategoryStats,
+    formatDuration,
+    formatDurationHours
   }
 }
