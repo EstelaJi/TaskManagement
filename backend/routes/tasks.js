@@ -1,86 +1,120 @@
-import express from 'express'
-const router = express.Router()
+import express from 'express';
+import { query } from '../config/database.js';
+const router = express.Router();
 
-// 临时内存存储（后续可以替换为数据库）
-let tasks = [
-  {
-    id: 1,
-    title: 'Learn Vue 3 basics',
-    description: 'Know the core concepts and Composition API of Vue 3',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  },
-]
+router.get('/', async (req, res) => {
+  try {
+    const { status, user_id, page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+    let sql, params;
 
-let nextId = 3
+    if (status && user_id) {
+      sql = 'SELECT * FROM tasks WHERE status = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4';
+      params = [status, user_id, limit, offset];
+    } else if (status) {
+      sql = 'SELECT * FROM tasks WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3';
+      params = [status, limit, offset];
+    } else if (user_id) {
+      sql = 'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3';
+      params = [user_id, limit, offset];
+    } else {
+      sql = 'SELECT * FROM tasks ORDER BY created_at DESC LIMIT $1 OFFSET $2';
+      params = [limit, offset];
+    }
 
-// 获取所有任务
-router.get('/', (req, res) => {
-  res.json(tasks)
-})
-
-// 获取单个任务
-router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+    const result = await query(sql, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch tasks' });
   }
-  
-  res.json(task)
-})
+});
 
-// 创建新任务
-router.post('/', (req, res) => {
-  const { title, description, status = 'pending' } = req.body
-  
-  if (!title) {
-    return res.status(400).json({ error: 'Title is required' })
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching task:', error);
+    res.status(500).json({ error: 'Failed to fetch task' });
   }
-  
-  const newTask = {
-    id: nextId++,
-    title,
-    description: description || '',
-    status,
-    createdAt: new Date().toISOString()
+});
+
+router.post('/', async (req, res) => {
+  try {
+    const { title, description, status = 'pending', priority = 'medium', category, due_date, user_id } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const sql = `
+      INSERT INTO tasks (title, description, status, priority, category, due_date, user_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `;
+    const result = await query(sql, [title, description || '', status, priority, category, due_date, user_id]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating task:', error);
+    res.status(500).json({ error: 'Failed to create task' });
   }
-  
-  tasks.push(newTask)
-  res.status(201).json(newTask)
-})
+});
 
-// 更新任务
-router.patch('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const task = tasks.find(t => t.id === id)
-  
-  if (!task) {
-    return res.status(404).json({ error: 'Task not found' })
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, status, priority, category, due_date, user_id } = req.body;
+
+    const checkResult = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const sql = `
+      UPDATE tasks
+      SET title = COALESCE($1, title),
+          description = COALESCE($2, description),
+          status = COALESCE($3, status),
+          priority = COALESCE($4, priority),
+          category = COALESCE($5, category),
+          due_date = COALESCE($6, due_date),
+          user_id = COALESCE($7, user_id),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $8
+      RETURNING *
+    `;
+    const result = await query(sql, [title, description, status, priority, category, due_date, user_id, id]);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating task:', error);
+    res.status(500).json({ error: 'Failed to update task' });
   }
-  
-  const { title, description, status } = req.body
-  
-  if (title !== undefined) task.title = title
-  if (description !== undefined) task.description = description
-  if (status !== undefined) task.status = status
-  
-  res.json(task)
-})
+});
 
-// 删除任务
-router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id)
-  const taskIndex = tasks.findIndex(t => t.id === id)
-  
-  if (taskIndex === -1) {
-    return res.status(404).json({ error: 'Task not found' })
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const checkResult = await query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    await query('DELETE FROM tasks WHERE id = $1', [id]);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ error: 'Failed to delete task' });
   }
-  
-  tasks.splice(taskIndex, 1)
-  res.status(204).send()
-})
+});
 
-export default router
-
+export default router;
