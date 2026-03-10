@@ -36,5 +36,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`)
+  console.log(`📊 Database: ${process.env.DB_NAME || 'not configured'}`)
 })
 
