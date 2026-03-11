@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import taskRoutes from './routes/tasks.js'
 import userRoutes from './routes/users.js'
+import { connectDB } from './models/index.js'
 
 dotenv.config()
 
@@ -10,7 +11,10 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // 中间件
-app.use(cors())
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true
+}))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -34,7 +38,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`)
-})
+// 启动服务器
+const startServer = async () => {
+  try {
+    // 先连接数据库
+    await connectDB()
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:${PORT}`)
+      console.log(`📊 API documentation: http://localhost:${PORT}/api/health`)
+    })
+  } catch (error) {
+    console.error('❌ Failed to start server:', error)
+    process.exit(1)
+  }
+}
+
+startServer()
 
